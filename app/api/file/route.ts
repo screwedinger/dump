@@ -1,51 +1,8 @@
 import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { NextResponse } from 'next/server'
-
-const client = new S3Client({
-  region: 'auto',
-  endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-  credentials: {
-    accessKeyId: process.env.R2_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
-  },
-})
-
-const mimeTypes: Record<string, string> = {
-  jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif',
-  webp: 'image/webp', avif: 'image/avif', heic: 'image/heic', heif: 'image/heif',
-  bmp: 'image/bmp', svg: 'image/svg+xml',
-  mp4: 'video/mp4', webm: 'video/webm', mov: 'video/quicktime', m4v: 'video/mp4',
-  pdf: 'application/pdf', txt: 'text/plain', json: 'application/json',
-}
-
-export const dynamic = 'force-dynamic'
-
-export async function GET(request: Request) {
-  try {
-    const key = new URL(request.url).searchParams.get('key')
-    if (!key) return NextResponse.json({ error: 'File key is required' }, { status: 400 })
-
-    const object = await client.send(new GetObjectCommand({
-      Bucket: process.env.R2_BUCKET_NAME!,
-      Key: key,
-    }))
-
-    if (!object.Body) return NextResponse.json({ error: 'File not found' }, { status: 404 })
-
-    const name = key.split('/').pop() || 'file'
-    const extension = name.includes('.') ? name.split('.').pop()!.toLowerCase() : ''
-    const contentType = object.ContentType || mimeTypes[extension] || 'application/octet-stream'
-
-    return new NextResponse(object.Body.transformToWebStream(), {
-      headers: {
-        'Content-Type': contentType,
-        ...(object.ContentLength !== undefined ? { 'Content-Length': String(object.ContentLength) } : {}),
-        'Content-Disposition': `inline; filename="${name.replace(/"/g, '')}"`,
-        'Cache-Control': 'public, max-age=31536000, immutable',
-      },
-    })
-  } catch (error) {
-    console.error('R2 file retrieval error:', error)
-    return NextResponse.json({ error: 'Could not retrieve file' }, { status: 404 })
-  }
-}
+import { createHmac, timingSafeEqual } from 'crypto'
+const client=new S3Client({region:'auto',endpoint:`https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,credentials:{accessKeyId:process.env.R2_ACCESS_KEY_ID!,secretAccessKey:process.env.R2_SECRET_ACCESS_KEY!}})
+const valid=(r:Request)=>{const c=r.headers.get('cookie')?.match(/(?:^|;\s*)dump_session=([^;]+)/)?.[1],k=process.env.DUMP_ACCESS_CODE;if(!c||!k)return false;const a=Buffer.from(c),b=Buffer.from(createHmac('sha256',k).update(`dump:${k}`).digest('hex'));return a.length===b.length&&timingSafeEqual(a,b)}
+const mime:Record<string,string>={jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',gif:'image/gif',webp:'image/webp',avif:'image/avif',mp4:'video/mp4',webm:'video/webm',mov:'video/quicktime',m4v:'video/mp4'}
+export const dynamic='force-dynamic'
+export async function GET(request:Request){if(!valid(request))return NextResponse.json({error:'UNAUTHORIZED'},{status:401});try{const key=new URL(request.url).searchParams.get('key');if(!key)return NextResponse.json({error:'File key is required'},{status:400});const range=request.headers.get('range');const o=await client.send(new GetObjectCommand({Bucket:process.env.R2_BUCKET_NAME!,Key:key,...(range?{Range:range}:{})}));if(!o.Body)return NextResponse.json({error:'File not found'},{status:404});const name=key.split('/').pop()||'file',ext=name.includes('.')?name.split('.').pop()!.toLowerCase():'';const h=new Headers({'Content-Type':o.ContentType||mime[ext]||'application/octet-stream','Content-Disposition':`inline; filename="${name.replace(/"/g,'')}"`,'Accept-Ranges':'bytes','Cache-Control':'private, max-age=3600'});if(o.ContentLength!==undefined)h.set('Content-Length',String(o.ContentLength));if(o.ContentRange)h.set('Content-Range',o.ContentRange);return new NextResponse(o.Body.transformToWebStream(),{status:range?206:200,headers:h})}catch(e){console.error(e);return NextResponse.json({error:'Could not retrieve file'},{status:404})}}
