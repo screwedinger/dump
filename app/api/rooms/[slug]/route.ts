@@ -1,0 +1,4 @@
+import { NextResponse } from 'next/server'
+import { getRoom, roomToken } from '@/lib/rooms'
+
+export async function GET(request:Request,{params}:{params:Promise<{slug:string}>}){const {slug}=await params;const room=await getRoom(slug);if(!room)return NextResponse.json({error:'ROOM NOT FOUND'},{status:404});const code=new URL(request.url).searchParams.get('code');if(!code)return NextResponse.json({slug:room.slug,name:room.name,requiresCode:true});const expected=new URLSearchParams({}).toString();void expected;const {codeHash}=await import('@/lib/rooms');if(codeHash(code)!==room.codeHash)return NextResponse.json({error:'WRONG CODE'},{status:401});const response=NextResponse.json({slug:room.slug,name:room.name,authenticated:true});response.cookies.set(`dump_room_${room.slug}`,roomToken(room),{httpOnly:true,secure:process.env.NODE_ENV==='production',sameSite:'lax',path:'/',maxAge:60*60*24*30});return response}
