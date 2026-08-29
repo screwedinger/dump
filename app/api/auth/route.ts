@@ -4,6 +4,14 @@ import { NextResponse } from 'next/server'
 const COOKIE = 'dump_session'
 const tokenFor = (code: string) => createHmac('sha256', process.env.DUMP_ACCESS_CODE || 'change-me').update(`dump:${code}`).digest('hex')
 
+export async function GET(request: Request) {
+  const cookie = request.headers.get('cookie')?.match(/(?:^|;\s*)dump_session=([^;]+)/)?.[1]
+  const expected = process.env.DUMP_ACCESS_CODE
+  if (!expected || !cookie) return NextResponse.json({ authenticated: false })
+  const a = Buffer.from(cookie); const b = Buffer.from(tokenFor(expected))
+  return NextResponse.json({ authenticated: a.length === b.length && timingSafeEqual(a, b) })
+}
+
 export async function POST(request: Request) {
   const { code } = await request.json().catch(() => ({}))
   const expected = process.env.DUMP_ACCESS_CODE
