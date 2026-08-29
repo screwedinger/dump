@@ -17,15 +17,11 @@ export async function GET(request: Request) {
     const key = new URL(request.url).searchParams.get('key')
     if (!key) return NextResponse.json({ error: 'File key is required' }, { status: 400 })
 
-    const object = await client.send(new GetObjectCommand({
-      Bucket: process.env.R2_BUCKET_NAME!,
-      Key: key,
-    }))
-
+    const object = await client.send(new GetObjectCommand({ Bucket: process.env.R2_BUCKET_NAME!, Key: key }))
     if (!object.Body) return NextResponse.json({ error: 'File not found' }, { status: 404 })
 
     const bytes = await object.Body.transformToByteArray()
-    return new NextResponse(bytes, {
+    return new NextResponse(Buffer.from(bytes), {
       headers: {
         'Content-Type': object.ContentType || 'application/octet-stream',
         'Content-Length': String(bytes.byteLength),
