@@ -1,33 +1,4 @@
 'use client'
-
 import { useEffect, useRef } from 'react'
 import styles from './cursor-cat.module.css'
-
-export default function CursorCat() {
-  const cat = useRef<HTMLDivElement>(null)
-  const target = useRef({ x: -100, y: -100 })
-  const current = useRef({ x: -100, y: -100 })
-
-  useEffect(() => {
-    const move = (e: MouseEvent) => { target.current = { x: e.clientX, y: e.clientY } }
-    const onLeave = () => { if (cat.current) cat.current.style.opacity = '0' }
-    const onEnter = () => { if (cat.current) cat.current.style.opacity = '1' }
-    window.addEventListener('mousemove', move)
-    document.documentElement.addEventListener('mouseleave', onLeave)
-    document.documentElement.addEventListener('mouseenter', onEnter)
-    let frame = 0
-    const animate = () => {
-      current.current.x += (target.current.x - current.current.x) * 0.12
-      current.current.y += (target.current.y - current.current.y) * 0.12
-      const dx = target.current.x - current.current.x
-      const dy = target.current.y - current.current.y
-      const angle = Math.max(-18, Math.min(18, dx * 0.08))
-      if (cat.current) cat.current.style.transform = `translate3d(${current.current.x + 18}px,${current.current.y + 18}px,0) rotate(${angle}deg)`
-      frame = requestAnimationFrame(animate)
-    }
-    frame = requestAnimationFrame(animate)
-    return () => { window.removeEventListener('mousemove', move); document.documentElement.removeEventListener('mouseleave', onLeave); document.documentElement.removeEventListener('mouseenter', onEnter); cancelAnimationFrame(frame) }
-  }, [])
-
-  return <div ref={cat} className={styles.cat} aria-hidden="true"><div className={styles.earLeft}/><div className={styles.earRight}/><div className={styles.face}><i className={styles.eyeLeft}/><i className={styles.eyeRight}/><i className={styles.nose}/><i className={styles.mouth}/></div><div className={styles.body}/><div className={styles.tail}/></div>
-}
+export default function CursorCat(){const cat=useRef<HTMLDivElement>(null),target=useRef({x:-100,y:-100}),current=useRef({x:-100,y:-100}),last=useRef({x:-100,y:-100}),phase=useRef(0);useEffect(()=>{const move=(e:MouseEvent)=>{target.current={x:e.clientX,y:e.clientY}};window.addEventListener('mousemove',move);let frame=0;const animate=()=>{const c=current.current,t=target.current,dx=t.x-c.x,dy=t.y-c.y,speed=Math.hypot(dx,dy);c.x+=dx*.1;c.y+=dy*.1;const moving=speed>1.5;phase.current+=moving?Math.min(.22,speed*.025):.035;const hop=moving?Math.max(0,Math.sin(phase.current))*Math.min(13,3+speed*.07):Math.sin(phase.current)*1.2;const dir=t.x-last.current.x;const facing=dir<-.5?-1:dir>.5?1:(cat.current?.dataset.face==='-1'?-1:1);if(cat.current){cat.current.dataset.face=String(facing);cat.current.classList.toggle(styles.running,moving);cat.current.style.transform=`translate3d(${c.x+20}px,${c.y+18-hop}px,0) scaleX(${facing}) rotate(${Math.max(-7,Math.min(7,dy*.035))}deg)`}last.current={...t};frame=requestAnimationFrame(animate)};frame=requestAnimationFrame(animate);return()=>{window.removeEventListener('mousemove',move);cancelAnimationFrame(frame)}},[]);return <div ref={cat} className={styles.cat} aria-hidden="true"><div className={styles.tail}/><div className={styles.body}><i className={styles.legBack}/><i className={styles.legFront}/></div><div className={styles.face}><i className={styles.eye}/><i className={styles.nose}/><i className={styles.whiskers}/></div></div>}
